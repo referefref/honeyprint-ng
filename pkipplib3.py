@@ -1,7 +1,7 @@
 #! /usr/bin/env python3
 # -*- coding: ISO-8859-15 -*-
 #
-# pkipplib : IPP and CUPS support for Python
+# pkipplib3 : IPP and CUPS support for Python
 #
 # (c) 2003, 2004, 2005, 2006 Jerome Alet <alet@librelogiciel.com>
 # (c) 2024 James Brine <james@jamesbrine.com.au>
