@@ -1,4 +1,5 @@
 # Copyright (C) 2013  Lukas Rist <glaslos@gmail.com>
+# Copyright (C) 2024  James Brine <james@jamesbrine.com.au>
 #
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
@@ -15,14 +16,20 @@
 # Foundation, Inc.,
 # 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 
+#!/usr/bin/python3
 
 import logging
 from pkipplib import pkipplib
-
 from gevent.server import StreamServer
+import colorlog
 
-logger = logging.getLogger(__name__)
+handler = colorlog.StreamHandler()
+handler.setFormatter(colorlog.ColoredFormatter(
+    '%(log_color)s%(levelname)s:%(name)s:%(message)s'))
 
+logger = colorlog.getLogger(__name__)
+logger.addHandler(handler)
+logger.setLevel(logging.INFO)
 
 class PrintServer(object):
 
@@ -30,27 +37,40 @@ class PrintServer(object):
         pass
 
     def handle(self, sock, address):
-        print address
+        logger.info(f'Connection from {address}')
         data = sock.recv(8192)
-        print repr(data)
+        logger.debug(f'Received data: {repr(data)}')
+
         try:
-            body = data.split('\r\n\r\n', 1)[1]
+            body = data.split(b'\r\n\r\n', 1)[1]
         except IndexError:
             body = data
         request = pkipplib.IPPRequest(body)
         request.parse()
-        print request
+        logger.info(f'Received request: {request}')
+        
+        if hasattr(request, 'operation'):
+            for attribute, value in request.operation.items():
+                logger.debug(f'Request operation attribute: {attribute}, value: {value}')
+        if hasattr(request, 'job'):
+            for attribute, value in request.job.items():
+                logger.debug(f'Request job attribute: {attribute}, value: {value}')
+        if hasattr(request, 'printer'):
+            for attribute, value in request.printer.items():
+                logger.debug(f'Request printer attribute: {attribute}, value: {value}')
+
         request = pkipplib.IPPRequest(operation_id=pkipplib.CUPS_GET_DEFAULT)
         request.operation["attributes-charset"] = ("charset", "utf-8")
         request.operation["attributes-natural-language"] = ("naturalLanguage", "en-us")
-        sock.send(request.dump())
+        response_data = request.dump().encode('utf-8')
+        sock.send(response_data)
+        logger.info('Response sent to the client')
 
     def get_server(self, host, port):
         connection = (host, port)
         server = StreamServer(connection, self.handle)
-        logger.info('LPR server started on: {0}'.format(connection))
+        logger.info(f'LPR server started on: {connection}')
         return server
-
 
 if __name__ == "__main__":
     ps = PrintServer()
