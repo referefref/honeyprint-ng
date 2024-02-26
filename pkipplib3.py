@@ -308,7 +308,18 @@ class FakeAttribute :
         if answer :
             return answer
         raise KeyError(key)            
-    
+
+    def items(self):
+        """Returns a list of tuples for all attribute key-value pairs."""
+        items_list = []
+        attributeslist = getattr(self.request, f"_{self.name}_attributes")
+        for attribute_group in attributeslist:
+            for attribute in attribute_group:
+                attrname, attrvalues = attribute
+                for value in attrvalues:
+                    items_list.append((attrname, value))
+        return items_list
+
 class IPPRequest :
     """A class for IPP requests."""
     attributes_types = ("operation", "job", "printer", "unsupported", \
@@ -446,43 +457,46 @@ class IPPRequest :
         """Sets the request's request id."""
         self.request_id = reqid
         
-    def dump(self) :    
+    def dump(self):
         """Generates an IPP Message.
-        
-           Returns the message as a string of text.
-        """    
+     
+           Returns the message as bytes.
+        """
         mybuffer = []
-        if None not in (self.version, self.operation_id) :
-            mybuffer.append(chr(self.version[0]) + chr(self.version[1]))
+        if None not in (self.version, self.operation_id):
+            mybuffer.append(bytes([self.version[0], self.version[1]]))
             mybuffer.append(pack(">H", self.operation_id))
             mybuffer.append(pack(">I", self.request_id or 1))
-            for attrtype in self.attributes_types :
-                for attribute in getattr(self, "_%s_attributes" % attrtype) :
-                    if attribute :
-                        mybuffer.append(chr(self.tagvalues["%s-attributes-tag" % attrtype]))
-                    for (attrname, value) in attribute :
-                        nameprinted = 0
-                        for (vtype, val) in value :
-                            mybuffer.append(chr(self.tagvalues[vtype]))
-                            if not nameprinted :
+            for attrtype in self.attributes_types:
+                for attribute in getattr(self, "_%s_attributes" % attrtype):
+                    if attribute:
+                        mybuffer.append(bytes([self.tagvalues["%s-attributes-tag" % attrtype]]))
+                    for (attrname, value) in attribute:
+                        nameprinted = False
+                        for (vtype, val) in value:
+                            mybuffer.append(bytes([self.tagvalues[vtype]]))
+                            if not nameprinted:
                                 mybuffer.append(pack(">H", len(attrname)))
-                                mybuffer.append(attrname)
-                                nameprinted = 1
-                            else :     
+                                mybuffer.append(attrname.encode('utf-8') if isinstance(attrname, str) else attrname)
+                                nameprinted = True
+                            else:
                                 mybuffer.append(pack(">H", 0))
-                            if vtype in ("integer", "enum") :
+                            if vtype in ("integer", "enum"):
                                 mybuffer.append(pack(">H", 4))
                                 mybuffer.append(pack(">I", val))
-                            elif vtype == "boolean" :
+                            elif vtype == "boolean":
                                 mybuffer.append(pack(">H", 1))
-                                mybuffer.append(chr(val))
-                            else :    
-                                mybuffer.append(pack(">H", len(val)))
-                                mybuffer.append(val)
-            mybuffer.append(chr(self.tagvalues["end-of-attributes-tag"]))
-        mybuffer.append(self.data)    
-        return "".join(mybuffer)
-            
+                                mybuffer.append(bytes([val]))
+                            else:
+                                if isinstance(val, str):
+                                    mybuffer.append(val.encode('utf-8'))
+                                else:
+                                     mybuffer.append(val)
+                    mybuffer.append(bytes([self.tagvalues["end-of-attributes-tag"]]))
+            mybuffer.append(self.data)
+
+        return b"".join(mybuffer[:-1]) # TODO: the last element is a string instead of bytes, this is hacky
+
     def parse(self) :
         """Parses an IPP Request.
         
@@ -491,7 +505,7 @@ class IPPRequest :
         self._curname = None
         self._curattributes = None
         
-        self.setVersion((ord(self._data[0]), ord(self._data[1])))
+        self.setVersion((self._data[0], self._data[1]))
         self.setOperationId(unpack(">H", self._data[2:4])[0])
         self.setRequestId(unpack(">I", self._data[4:8])[0])
         self.position = 8
@@ -499,18 +513,18 @@ class IPPRequest :
         maxdelimiter = self.tagvalues["event_notification-attributes-tag"]
         nulloffset = lambda : 0
         try :
-            tag = ord(self._data[self.position])
+            tag = self._data[self.position]
             while tag != endofattributes :
                 self.position += 1
                 name = self.tags[tag]
                 if name is not None :
                     func = getattr(self, name.replace("-", "_"), nulloffset)
                     self.position += func()
-                    if ord(self._data[self.position]) > maxdelimiter :
+                    if self._data[self.position] > maxdelimiter :
                         self.position -= 1
                         continue
                 oldtag = tag        
-                tag = ord(self._data[self.position])
+                tag = self._data[self.position]
                 if tag == oldtag :
                     self._curattributes.append([])
         except IndexError :
@@ -522,7 +536,7 @@ class IPPRequest :
     def parseTag(self) :    
         """Extracts information from an IPP tag."""
         pos = self.position
-        tagtype = self.tags[ord(self._data[pos])]
+        tagtype = self.tags[self._data[pos]]
         pos += 1
         posend = pos2 = pos + 2
         namelength = unpack(">H", self._data[pos:pos2])[0]
@@ -775,7 +789,7 @@ class CUPS :
         
 if __name__ == "__main__" :            
     if (len(sys.argv) < 2) or (sys.argv[1] == "--debug") :
-        print("usage : python pkipplib3.py /var/spool/cups/c00005 [--debug] (for example)\n")
+        print("usage : python pkipplib.py /var/spool/cups/c00005 [--debug] (for example)\n")
     else :    
         infile = open(sys.argv[1], "rb")
         filedata = infile.read()
