@@ -775,7 +775,7 @@ class CUPS :
         
 if __name__ == "__main__" :            
     if (len(sys.argv) < 2) or (sys.argv[1] == "--debug") :
-        print("usage : python pkipplib.py /var/spool/cups/c00005 [--debug] (for example)\n")
+        print("usage : python pkipplib3.py /var/spool/cups/c00005 [--debug] (for example)\n")
     else :    
         infile = open(sys.argv[1], "rb")
         filedata = infile.read()
