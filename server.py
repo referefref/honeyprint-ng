@@ -19,7 +19,7 @@
 #!/usr/bin/python3
 
 import logging
-from pkipplib import pkipplib
+import pkipplib3 as pkipplib
 from gevent.server import StreamServer
 import colorlog
 
