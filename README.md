@@ -1,7 +1,6 @@
-Honeyprint
-==========
+![printerrobot](https://github.com/referefref/honeyprint-ng/assets/56499429/c27768c2-fa76-4716-b346-595563812b43)
 
-* Forked from Lukas' original Printer honeypot PoC - migrated to Python3 with added verbosity.
+* Forked from Lukas' (Glaslos) [***original Printer honeypot PoC***](https://github.com/glaslos/honeyprint) - migrated to Python3 with added verbosity.
 * pkipplib was never ported to Python3, as a result a port has been included in this project
 
 ## Installation
